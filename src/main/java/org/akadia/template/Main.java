@@ -14,8 +14,10 @@ import net.md_5.bungee.config.YamlConfiguration;
 import net.md_5.bungee.event.EventHandler;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 
@@ -64,13 +66,42 @@ public class Main extends Plugin implements Listener {
         }
 
         System.out.println(configuration.getInt("version"));
+        configuration.set("write", "fromPlugin");
+        try {
+            ConfigurationProvider.getProvider(YamlConfiguration.class).save(configuration, new File(getDataFolder(), "config.yml"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
+        logToFile("Server logging");
     }
 
     @EventHandler
     public void onPostLogin(PostLoginEvent event) {
         for (ProxiedPlayer player : ProxyServer.getInstance().getPlayers()) {
             player.sendMessage(new TextComponent(event.getPlayer().getName() + " has joined the network."));
+        }
+    }
+
+    public void logToFile(String message) {
+        try {
+            File dataFolder = getDataFolder();
+            if (!dataFolder.exists()) {
+                dataFolder.mkdir();
+            }
+
+            File saveTo = new File(getDataFolder(), "log.txt");
+            if (!saveTo.exists()) {
+                saveTo.createNewFile();
+            }
+
+            FileWriter fw = new FileWriter(saveTo, true);
+            PrintWriter pw = new PrintWriter(fw);
+            pw.println(message);
+            pw.flush();
+            pw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 }
