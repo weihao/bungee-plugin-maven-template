@@ -8,6 +8,8 @@ import net.md_5.bungee.api.connection.ProxiedPlayer;
 import net.md_5.bungee.api.event.PostLoginEvent;
 import net.md_5.bungee.api.plugin.Listener;
 import net.md_5.bungee.api.plugin.Plugin;
+import net.md_5.bungee.api.plugin.PluginManager;
+import net.md_5.bungee.api.scheduler.TaskScheduler;
 import net.md_5.bungee.config.Configuration;
 import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
@@ -27,13 +29,13 @@ public class Main extends Plugin implements Listener {
     @Override
     public void onEnable() {
         getLogger().info("Yay! It loads!");
+        PluginManager pm = getProxy().getPluginManager();
+        pm.registerListener(this, this);
+        pm.registerCommand(this, new Lobby());
 
-        getProxy().getPluginManager().registerListener(this, this);
-        getProxy().getPluginManager().registerCommand(this, new Lobby());
-
-
-        getProxy().getScheduler().runAsync(this, () -> System.out.println("Hello from Runnable"));
-        getProxy().getScheduler().schedule(this, () -> {
+        TaskScheduler scheduler = getProxy().getScheduler();
+        scheduler.runAsync(this, () -> getLogger().info("Hello from Runnable"));
+        scheduler.schedule(this, () -> {
             for (ProxiedPlayer player : ProxyServer.getInstance().getPlayers()) {
                 player.sendMessage(
                         new ComponentBuilder("Currently online players count: ")
@@ -45,19 +47,7 @@ public class Main extends Plugin implements Listener {
         }, 0, 10, TimeUnit.SECONDS);
 
 
-        if (!getDataFolder().exists()) {
-            getDataFolder().mkdir();
-        }
-
-        File file = new File(getDataFolder(), "config.yml");
-
-        if (!file.exists()) {
-            try (InputStream in = getResourceAsStream("config.yml")) {
-                Files.copy(in, file.toPath());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+        createFile("config.yml", true);
 
         try {
             configuration = ConfigurationProvider.getProvider(YamlConfiguration.class).load(new File(getDataFolder(), "config.yml"));
@@ -65,7 +55,7 @@ public class Main extends Plugin implements Listener {
             e.printStackTrace();
         }
 
-        System.out.println(configuration.getInt("version"));
+        getLogger().info(String.valueOf(configuration.getInt("version")));
         configuration.set("write", "fromPlugin");
         try {
             ConfigurationProvider.getProvider(YamlConfiguration.class).save(configuration, new File(getDataFolder(), "config.yml"));
@@ -85,16 +75,7 @@ public class Main extends Plugin implements Listener {
 
     public void logToFile(String message) {
         try {
-            File dataFolder = getDataFolder();
-            if (!dataFolder.exists()) {
-                dataFolder.mkdir();
-            }
-
-            File saveTo = new File(getDataFolder(), "log.txt");
-            if (!saveTo.exists()) {
-                saveTo.createNewFile();
-            }
-
+            File saveTo = createFile("log.txt");
             FileWriter fw = new FileWriter(saveTo, true);
             PrintWriter pw = new PrintWriter(fw);
             pw.println(message);
@@ -103,5 +84,32 @@ public class Main extends Plugin implements Listener {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public File createFile(String filename) {
+        return createFile(filename, false);
+    }
+
+    public File createFile(String filename, boolean copyFromResource) {
+        File saveTo = null;
+        try {
+            File dataFolder = getDataFolder();
+            if (!dataFolder.exists()) {
+                dataFolder.mkdir();
+            }
+
+            saveTo = new File(dataFolder, filename);
+            if (!saveTo.exists()) {
+                if (copyFromResource) {
+                    InputStream in = getResourceAsStream(filename);
+                    Files.copy(in, saveTo.toPath());
+                } else {
+                    saveTo.createNewFile();
+                }
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+        return saveTo;
     }
 }
